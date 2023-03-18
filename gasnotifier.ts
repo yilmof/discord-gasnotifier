@@ -23,6 +23,8 @@ if (!ETHERSCAN_API_KEY || !DISCORD_WEBHOOK_URL) {
     Deno.exit()
 }
 
+let lastAlertTime = 0;
+
 const checkGas = async (): Promise<number> => {
     const etherscanResp = await fetch(`https://api.etherscan.io/api?module=gastracker&action=gasoracle&apikey=${ETHERSCAN_API_KEY}`)
     const data = await etherscanResp.json() as Etherscan
@@ -37,13 +39,19 @@ const runGasChecker = () => {
             const price = await checkGas()
             console.log(`Current gasprice: ${price}`)
             if (price < parseFloat(Deno.args[0])) {
-                await post(
-                    DISCORD_WEBHOOK_URL,
-                    {
-                        content: `Gasprice: ${price}`
-                    }
-                )
-                console.log(`Sent discord alert for gasprice: ${price}`)
+                const now = Date.now();
+                if (now - lastAlertTime >= 3600000) {
+                    await post(
+                        DISCORD_WEBHOOK_URL,
+                        {
+                            content: `Gasprice: ${price}`
+                        }
+                    )
+                    console.log(`Sent discord alert for gasprice: ${price}`)
+                    lastAlertTime = now;
+                }
+            } else {
+                console.log(`Skipping discord alert for gasprice: ${price}`)
             }
         })();
     }, 10000)
